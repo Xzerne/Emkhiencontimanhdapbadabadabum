@@ -1,25 +1,27 @@
-local ServerIDs = {} 
-local Cursor = ""
-local CurrentHour = os.date("!*t").hour
-
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
-local success, data = pcall(function()
-    return readfile("server_hop_data.json")
-end)
+local ServerIDs = {}
+local Cursor = ""
 
-if success and data then
-    ServerIDs = HttpService:JSONDecode(data)
-else
-    ServerIDs = {CurrentHour}
-    pcall(function()
-        writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
+local function LoadServerIDs()
+    local success, data = pcall(function()
+        return readfile("server_hop_data.json")
     end)
+    if success and data then
+        ServerIDs = HttpService:JSONDecode(data)
+    else
+        ServerIDs = {}
+        pcall(function()
+            writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
+        end)
+    end
 end
 
-if ServerIDs[1] ~= CurrentHour then
-    ServerIDs = {CurrentHour}
+local function SaveServerID(id)
+    table.insert(ServerIDs, id)
     pcall(function()
         writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
     end)
@@ -39,52 +41,47 @@ local function FindAndTeleport(placeId, region)
     end)
 
     if not success or not ServerList or not ServerList.data then
-        return
+        warn("Failed to fetch server list. Retrying...")
+        task.wait(2)
+        return FindAndTeleport(placeId, region)
     end
 
     Cursor = ServerList.nextPageCursor or ""
 
     for _, server in pairs(ServerList.data) do
         if tonumber(server.playing) < tonumber(server.maxPlayers) then
-            local ServerID = tostring(server.id)
-            local isNewServer = not table.find(ServerIDs, ServerID)
-
-            if isNewServer then
-                table.insert(ServerIDs, ServerID)
-                pcall(function()
-                    writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
+            local serverID = tostring(server.id)
+            if not table.find(ServerIDs, serverID) then
+                SaveServerID(serverID)
+                local teleportSuccess, errorMsg = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(placeId, serverID, LocalPlayer)
                 end)
-
-                local teleportSuccess = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(placeId, ServerID, game.Players.LocalPlayer)
-                end)
-
                 if teleportSuccess then
                     return
+                else
+                    warn("Teleport failed: " .. tostring(errorMsg))
+                    task.wait(2)
                 end
-
-                task.wait(2)
             end
         end
+    end
+
+    if Cursor ~= "" then
+        FindAndTeleport(placeId, region)
+    else
+        warn("No available servers found. Retrying in 3 seconds...")
+        task.wait(3)
+        Cursor = ""
+        FindAndTeleport(placeId, region)
     end
 end
 
 local ServerHopAPI = {}
 
 function ServerHopAPI:Teleport(placeId, region)
-    while task.wait(1) do
-        local success = pcall(function()
-            FindAndTeleport(placeId, region)
-        end)
-
-        if not success then
-            warn("Failed to find or teleport to a server. Retrying...")
-        end
-
-        if Cursor == "" then
-            break
-        end
-    end
+    LoadServerIDs()
+    FindAndTeleport(placeId, region)
+    print('Bada Badabum Hop')
 end
 
 return ServerHopAPI
