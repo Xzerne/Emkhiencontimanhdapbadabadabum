@@ -122,6 +122,7 @@ local function thongbao(title, content, duration, button1Text, button2Text, butt
     end)
 end
 
+return thongbao
 --[[
 thongbao(
     "Bada Badabum",
