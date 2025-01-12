@@ -5,7 +5,7 @@ screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 local frame = Instance.new("Frame")
 frame.Name = "NotificationFrame"
 frame.Parent = screenGui
-frame.Size = UDim2.new(0.3, 0, 0.2, 0)  -- Increased height for buttons
+frame.Size = UDim2.new(0.3, 0, 0.2, 0)
 frame.Position = UDim2.new(0.35, 0, 0.1, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BackgroundTransparency = 0.3
@@ -37,6 +37,7 @@ contentLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 contentLabel.TextScaled = true
 contentLabel.Font = Enum.Font.Gotham
 
+-- Button 1
 local button1 = Instance.new("TextButton")
 button1.Name = "Button1"
 button1.Parent = frame
@@ -46,11 +47,12 @@ button1.BackgroundColor3 = Color3.fromRGB(50, 150, 250)
 button1.TextColor3 = Color3.fromRGB(255, 255, 255)
 button1.TextScaled = true
 button1.Font = Enum.Font.GothamBold
-button1.Text = "Button 1"
+button1.Visible = false
 
 local corner1 = Instance.new("UICorner")
 corner1.CornerRadius = UDim.new(0.1, 0)
 corner1.Parent = button1
+
 
 local button2 = Instance.new("TextButton")
 button2.Name = "Button2"
@@ -61,7 +63,7 @@ button2.BackgroundColor3 = Color3.fromRGB(250, 100, 100)
 button2.TextColor3 = Color3.fromRGB(255, 255, 255)
 button2.TextScaled = true
 button2.Font = Enum.Font.GothamBold
-button2.Text = "Button 2"
+button2.Visible = false
 
 local corner2 = Instance.new("UICorner")
 corner2.CornerRadius = UDim.new(0.1, 0)
@@ -69,29 +71,55 @@ corner2.Parent = button2
 
 frame.Visible = false
 
+local button1Connection
+local button2Connection
+
 local function thongbao(title, content, duration, button1Text, button2Text, button1Func, button2Func)
     titleLabel.Text = title
     contentLabel.Text = content
-    button1.Text = button1Text or "Button 1"
-    button2.Text = button2Text or "Button 2"
 
-    button1.MouseButton1Click:Connect(function()
-        if button1Func then
+   
+    if button1Connection then
+        button1Connection:Disconnect()
+    end
+    if button2Connection then
+        button2Connection:Disconnect()
+    end
+
+    
+    if button1Text and button1Func then
+        button1.Text = button1Text
+        button1.Visible = true
+        button1Connection = button1.MouseButton1Click:Connect(function()
             button1Func()
-        end
-    end)
+            frame.Visible = false
+        end)
+    else
+        button1.Visible = false
+    end
 
-    button2.MouseButton1Click:Connect(function()
-        if button2Func then
+    
+    if button2Text and button2Func then
+        button2.Text = button2Text
+        button2.Visible = true
+        button2Connection = button2.MouseButton1Click:Connect(function()
             button2Func()
-        end
-    end)
+            frame.Visible = false
+        end)
+    else
+        button2.Visible = false
+    end
 
     frame.Visible = true
     frame:TweenSize(UDim2.new(0.3, 0, 0.2, 0), "Out", "Sine", 0.5, true)
-    wait(duration)
-    frame:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Sine", 0.5, true, function()
-        frame.Visible = false
+
+    
+    task.delay(duration, function()
+        if frame.Visible then
+            frame:TweenSize(UDim2.new(0, 0, 0, 0), "In", "Sine", 0.5, true, function()
+                frame.Visible = false
+            end)
+        end
     end)
 end
 
@@ -109,4 +137,5 @@ thongbao(
         print("No button clicked")
     end
 )
---]}
+
+--]]
