@@ -1,65 +1,89 @@
-local ServerIDs = {}
+local ServerIDs = {} 
 local Cursor = ""
 local CurrentHour = os.date("!*t").hour
+
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 
-local File = pcall(function()
-    ServerIDs = HttpService:JSONDecode(readfile("server_hop_data.json"))
+local success, data = pcall(function()
+    return readfile("server_hop_data.json")
 end)
-if not File then
-    table.insert(ServerIDs, CurrentHour)
+
+if success and data then
+    ServerIDs = HttpService:JSONDecode(data)
+else
+    ServerIDs = {CurrentHour}
+    pcall(function()
+        writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
+    end)
+end
+
+if ServerIDs[1] ~= CurrentHour then
+    ServerIDs = {CurrentHour}
     pcall(function()
         writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
     end)
 end
 
 local function FindAndTeleport(placeId, region)
-    local ServerList
-    if Cursor == "" then
-        ServerList = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. placeId .. '/servers/Public?sortOrder=Asc&limit=100&region=' .. region))
-    else
-        ServerList = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. placeId .. '/servers/Public?sortOrder=Asc&limit=100&cursor=' .. Cursor .. '&region=' .. region))
+    local url = 'https://games.roblox.com/v1/games/' .. placeId .. '/servers/Public?sortOrder=Asc&limit=100'
+    if Cursor ~= "" then
+        url = url .. "&cursor=" .. Cursor
+    end
+    if region then
+        url = url .. "&region=" .. region
     end
 
-    local ServerID = ""
-    if ServerList.nextPageCursor then
-        Cursor = ServerList.nextPageCursor
+    local success, ServerList = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+
+    if not success or not ServerList or not ServerList.data then
+        return
     end
+
+    Cursor = ServerList.nextPageCursor or ""
 
     for _, server in pairs(ServerList.data) do
-        local IsNewServer = true
-        ServerID = tostring(server.id)
-        if tonumber(server.maxPlayers) > tonumber(server.playing) then
-            for _, existingID in pairs(ServerIDs) do
-                if ServerID == tostring(existingID) then
-                    IsNewServer = false
-                    break
-                end
-            end
-            if IsNewServer then
+        if tonumber(server.playing) < tonumber(server.maxPlayers) then
+            local ServerID = tostring(server.id)
+            local isNewServer = not table.find(ServerIDs, ServerID)
+
+            if isNewServer then
                 table.insert(ServerIDs, ServerID)
                 pcall(function()
                     writefile("server_hop_data.json", HttpService:JSONEncode(ServerIDs))
                 end)
-                pcall(function()
+
+                local teleportSuccess = pcall(function()
                     TeleportService:TeleportToPlaceInstance(placeId, ServerID, game.Players.LocalPlayer)
                 end)
-                wait(4)
+
+                if teleportSuccess then
+                    return
+                end
+
+                task.wait(2)
             end
         end
     end
 end
 
 local ServerHopAPI = {}
+
 function ServerHopAPI:Teleport(placeId, region)
-    while wait() do
-        pcall(function()
+    while task.wait(1) do
+        local success = pcall(function()
             FindAndTeleport(placeId, region)
-            if Cursor ~= "" then
-                FindAndTeleport(placeId, region)
-            end
         end)
+
+        if not success then
+            warn("Failed to find or teleport to a server. Retrying...")
+        end
+
+        if Cursor == "" then
+            break
+        end
     end
 end
 
