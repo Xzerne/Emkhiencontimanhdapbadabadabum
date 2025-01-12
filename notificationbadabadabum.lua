@@ -37,7 +37,6 @@ contentLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 contentLabel.TextScaled = true
 contentLabel.Font = Enum.Font.Gotham
 
--- Button 1
 local button1 = Instance.new("TextButton")
 button1.Name = "Button1"
 button1.Parent = frame
