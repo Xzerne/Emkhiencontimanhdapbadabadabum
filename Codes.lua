@@ -1,4 +1,4 @@
-local C0de = {
+local Codes = {
     "Enyo_is_Pro",
     "Magicbus",
     "JCWK",
@@ -47,4 +47,4 @@ local C0de = {
 	"NOOB2ADMIN",
 	"Sub2CaptainMaui"
 }
-return C0de
+return Codes
