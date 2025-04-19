@@ -1,6 +1,8 @@
 
 getgenv().speed = 140
 getgenv().floorToLeave = 26
+
+if getgenv().count then
 local screenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
 screenGui.Name = "CountdownGui"
 
@@ -25,6 +27,8 @@ function updateCountdown()
  else
   textLabel.Text = minutesLeft .. "m " .. secondsLeft .. "s"
  end
+end
+
 end
 
 local thongbao = loadstring(game:HttpGet('https://raw.githubusercontent.com/Xzerne/Emkhiencontimanhdapbadabadabum/refs/heads/main/Utils/notificationbadabadabum.lua'))()
@@ -77,7 +81,9 @@ function tp(cframe)
 
  local success = pcall(function()
   hrp.CFrame = cframe
+  if getgenv().join then
   thongbao("CASTLE SPAWNED!", "Teleporting!", 2)
+  end
  end)
 
  if not success then
@@ -90,7 +96,9 @@ function tp(cframe)
   local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear)
   local tween = TweenService:Create(hrp, tweenInfo, goal)
   tween:Play()
+  if getgenv().join then
   thongbao("FAILED TO TELEPORT :(", "Trying to tween", 5)
+  end
  end
 end
 
@@ -177,35 +185,66 @@ local function FindNearestEnemy()
 end
 
 spawn(function()
- local lastRoom = nil
- while wait() do
-  if getgenv().autocastle and game.PlaceId ~= 87039211657390 then
-   local room = getBiggestRoom()
-   if room and room ~= lastRoom then
-    lastRoom = room
-    teleportToRoom(room)
-   end
+    local lastRoom = nil
 
-   local targetEnemy = FindNearestEnemy()
-   if targetEnemy then
-    if targetEnemy.instance:IsDescendantOf(workspace) and targetEnemy.healthText.ContentText ~= "0 HP" then
-     tp(targetEnemy.rootPart.CFrame * CFrame.new(0, 0, 6))
-     local args = {
-      { { Event = "PunchAttack", Enemy = targetEnemy.name }, "\4" }
-     }
-     game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-     task.wait()
+    while task.wait() do
+        if getgenv().autocastle and game.PlaceId ~= 87039211657390 then
+            local room = getBiggestRoom()
+            if room and room ~= lastRoom then
+                lastRoom = room
+                teleportToRoom(room)
+            end
+
+            local targetEnemy = FindNearestEnemy()
+            if targetEnemy then
+                local instance = targetEnemy.instance
+                local hpText = targetEnemy.healthText
+                local rootPart = targetEnemy.rootPart
+
+                if instance and instance:IsDescendantOf(workspace) and hpText and hpText.ContentText ~= "0 HP" then
+                    tp(rootPart.CFrame * CFrame.new(0, 0, 6))
+
+                    
+                    local title = targetEnemy.instance:FindFirstChild("HealthBar") and
+                                  targetEnemy.instance.HealthBar:FindFirstChild("Main") and
+                                  targetEnemy.instance.HealthBar.Main:FindFirstChild("Title")
+                    if title and title.ContentText == "Wesil" then
+                 
+                    arisePrompt = targetEnemy.HumanoidRootPart.ArisePrompt
+                        arisePrompt:SetAttribute("MaxActivationDistance", 100000)
+                    fireproximityprompt(arisePrompt)
+                    end
+
+                  
+                    local args = {
+                        { { Event = "PunchAttack", Enemy = targetEnemy.name }, "\4" }
+                    }
+                    game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+                end
+            else
+                local newRoom = getBiggestRoom()
+                if newRoom and newRoom ~= lastRoom then
+                    lastRoom = newRoom
+                    teleportToRoom(newRoom)
+                end
+            end
+
+            task.wait(1)
+        end
     end
-   else
-    local newRoom = getBiggestRoom()
-    if newRoom and newRoom ~= lastRoom then
-     lastRoom = newRoom
-     teleportToRoom(newRoom)
-    end
-   end
-   task.wait(1)
-  end
- end
+end)
+
+
+spawn(function()
+while wait() do
+pcall(function()
+if getgenv().AutoArise == true then
+getgenv().AutoDestory = false
+elseif getgenv().AutoDestroy == true then
+getgenv().AutoArise = false
+end
+end)
+end
 end)
 
 function TpGameId(Id)
@@ -402,35 +441,43 @@ end
 
 local function getNearestSelectedEnemy()
     local character = game.Players.LocalPlayer.Character
-    if not character then return nil end
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-
+    local hrp = character.HumanoidRootPart
     local enemiesFolder = workspace:WaitForChild("__Main"):WaitForChild("__Enemies"):WaitForChild("Client")
     local nearestEnemy = nil
     local shortestDistance = math.huge
-    local playerPosition = hrp.Position
 
     for _, enemy in ipairs(enemiesFolder:GetChildren()) do
         if enemy:IsA("Model") and enemy:FindFirstChild("HumanoidRootPart") then
             local healthBar = enemy:FindFirstChild("HealthBar")
-            if healthBar and healthBar:FindFirstChild("Main") and healthBar.Main:FindFirstChild("Title") then
-                local title = healthBar.Main.Title
-                if title:IsA("TextLabel") and title.ContentText == getgenv().MobsSelects and not killedNPCs[enemy.Name] then
-                    local enemyPosition = enemy.HumanoidRootPart.Position
-                    local distance = (playerPosition - enemyPosition).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        nearestEnemy = enemy
-                      
-                    end
+            local main = healthBar and healthBar:FindFirstChild("Main")
+            local title = main and main:FindFirstChild("Title")
+            local healthText = main and main:FindFirstChild("Health")
+
+            if title and healthText and title:IsA("TextLabel") 
+                and table.find(getgenv().MobsSelects, title.ContentText)
+                and healthText.ContentText ~= "0 HP"
+                and not killedNPCs[enemy.Name] then
+
+                local distance = (hrp.Position - enemy.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    nearestEnemy = {
+                        instance = enemy,
+                        name = enemy.Name,
+                        rootPart = enemy.HumanoidRootPart,
+                        healthText = healthText,
+                        title = title
+                    }
                 end
             end
         end
     end
+
     return nearestEnemy
 end
+
 
 
 
@@ -506,7 +553,6 @@ end)
 
 SizeDrop:OnChanged(function(Value)
     getgenv().SizeSelector = type(Value) == "table" and Value[1] or Value
-    killedNPCs = {}
 end)
 
 
@@ -521,79 +567,38 @@ Tabs.Main1:AddToggle("AutoFarm", {
 })
 
 
---[[
-spawn(function()
-    while wait() do
-        if getgenv().AutoFarm then
-            local mobToFarm = getNearestSelectedEnemy()
-            
-            if mobToFarm then
-                local rootPart = mobToFarm:FindFirstChild("HumanoidRootPart")
-                local healthBar = mobToFarm:FindFirstChild("HealthBar")
-                local healthText = healthBar and healthBar:FindFirstChild("Main") and healthBar.Main:FindFirstChild("Health")
-                local title = healthBar and healthBar:FindFirstChild("Main") and healthBar.Main:FindFirstChild("Title")
-
-                if rootPart and healthText and title and title.ContentText == getgenv().MobsSelects and healthText.ContentText ~= "0 HP" then
-                    if getgenv().SizeSelector == 'Small' then
-                        rootPart.Size = Vector3.new(2, 2, 1)
-                        tp(rootPart.CFrame * CFrame.new(0, 0, 6))
-                    elseif getgenv().SizeSelector == 'Big' then
-                        rootPart.Size = Vector3.new(4, 4, 2)
-                        tp(rootPart.CFrame * CFrame.new(0, 0, 8))
-                    end
-
-                    local args = {
-                        {
-                            { Event = "PunchAttack", Enemy = mobToFarm.Name },
-                            "\4"
-                        }
-                    }
-                    game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
-                end
-            end
-            task.wait(0.8)
-        end
-    end
-end)
---]]
-
-     
 spawn(function()
     while task.wait(0.2) do
         if getgenv().AutoFarm then
             local mob = getNearestSelectedEnemy()
+            if mob and mob.instance:IsDescendantOf(workspace) then
+                local rootPart = mob.rootPart
+                local size = rootPart.Size
+                local selectedSize = getgenv().SizeSelector
 
-            if mob and mob.Parent then
-                local rootPart = mob:FindFirstChild("HumanoidRootPart")
-                local healthBar = mob:FindFirstChild("HealthBar")
-                local healthText = healthBar and healthBar:FindFirstChild("Main") and healthBar.Main:FindFirstChild("Health")
-                local title = healthBar and healthBar:FindFirstChild("Main") and healthBar.Main:FindFirstChild("Title")
+                local correctSize = (selectedSize == "Small" and size == Vector3.new(2, 2, 1))
+                    or (selectedSize == "Big" and size == Vector3.new(4, 4, 2))
 
-                local sizeFilter = getgenv().SizeSelector
-                local expectedSize = (sizeFilter == "Small") and Vector3.new(2, 2, 1) or
-                                     (sizeFilter == "Big") and Vector3.new(4, 4, 2)
+                if correctSize and mob.healthText.ContentText ~= "0 HP" then
+                    tp(rootPart.CFrame * CFrame.new(0, 0, 6))
 
-                if rootPart and healthText and title and healthText.ContentText ~= "0 HP" then
-                    if title.ContentText == getgenv().MobsSelects and rootPart.Size == expectedSize then
-                        tp(rootPart.CFrame * CFrame.new(0, 0, 6))
-
-                        local args = {
-                            {
-                                { Event = "PunchAttack", Enemy = mob.Name },
-                                "\4"
-                            }
+                    local args = {
+                        {
+                            { Event = "PunchAttack", Enemy = mob.name },
+                            "\4"
                         }
-                        game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+                    }
 
-                        while mob and mob.Parent and healthText.ContentText ~= "0 HP" and getgenv().AutoFarm do
-                            task.wait(0.1)
-                        end
-                    end
+                    game:GetService("ReplicatedStorage"):WaitForChild("BridgeNet2"):WaitForChild("dataRemoteEvent"):FireServer(unpack(args))
+
+                    repeat task.wait(0.1) until mob.healthText.ContentText == "0 HP" or not mob.instance:IsDescendantOf(workspace)
+                    killedNPCs[mob.name] = true
                 end
             end
         end
     end
 end)
+
 
 
 
